@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<style>
+		#info {
+			position: absolute;
+			top: 0px;
+			width: 100%;
+			padding: 10px;
+			text-align: center;
+			color: #0e1796;
+		}
+
+		body {
+		  overflow: hidden;
+		}
+	</style>
+</head>
+
+<body>
+<div id='info'>
+    <h1>homework1</h1>
+	<h2>Game Physics<h2>
+</div>
+
+<audio id="collisionSound" style="display:none">
+    <source src="https://jyunming-chen.github.io/game3js/gameHWhelpers/sounds/collision3.wav" type="audio/wav">
+</audio>
+
+<script type="importmap">
+		{
+			"imports": {
+				"three": "https://unpkg.com/three/build/three.module.js"
+			}
+		}
+</script>
+
+<script type="module">
+
+import * as THREE from 'https://threejs.org/build/three.module.js';
+import { OrbitControls } from 'https://threejs.org/examples/jsm/controls/OrbitControls.js';
+import { MTLLoader } from 'https://threejs.org/examples/jsm/loaders/MTLLoader.js';
+import { OBJLoader } from 'https://threejs.org/examples/jsm/loaders/OBJLoader.js';
+
+
+var scene, camera, renderer,controls;
+var lightA, lightB;
+var light, light2,light3,light4,light5;//球球
+var angle = 0;
+var walls = [];
+var balls = [];
+
+const R =8;
+
+class Wall{
+    constructor (pos,mesh){
+        this.pos = pos;
+        this.mesh = mesh.clone();
+        this.mesh.position.copy (this.pos);
+        scene.add(this.mesh);
+    }
+    rotation(angle){
+        this.mesh.rotation.y = angle;
+    }
+}  
+
+class Ball {
+   constructor (pos, vel, mesh) {
+        this.pos = pos;
+        this.vel = vel;
+        this.force = new THREE.Vector3(0,0,0);//?
+        this.mesh = mesh;
+        scene.add (this.mesh);
+        this.mesh.material.color = new THREE.Color().setHSL (Math.random(), 0.5, .7);
+   }
+   /////
+   colorEach(){
+        return this.mesh.material.color;
+    }
+    ballBallIntersect(ball2){
+        const P1 = this.pos;
+        const P2 = ball2.pos;
+        const u = P1.clone().sub(P2.clone());
+        return u.length() <= 2*R ;
+    }
+	////
+	update(dt) {
+        this.vel.add (this.force.clone().multiplyScalar (dt));
+        this.pos.add (this.vel.clone().multiplyScalar (dt));
+
+        if (this.pos.z < -100+R) {
+            collisionSound.play();
+			this.vel.z = - this.vel.z;
+            this.pos.z = -100+R;            
+        }
+        if (this.pos.z > 100-R) {
+            collisionSound.play();
+			this.vel.z = - this.vel.z;
+            this.pos.z = 100-R;            
+        }
+        if (this.pos.x > 100-R) {
+            collisionSound.play();
+			this.vel.x = - this.vel.x;
+            this.pos.x = 100-R;
+        }
+        if (this.pos.x < -100+R) {
+            collisionSound.play();
+			this.vel.x = - this.vel.x;
+            this.pos.x = -100+R;            
+        }
+
+        this.mesh.position.copy (this.pos);
+
+   }
+}
+
+function buildWallMesh () {
+  let wallMesh = new THREE.Mesh (new THREE.BoxGeometry(240,40, 20), new THREE.MeshPhongMaterial({side: THREE.DoubleSide,color:"gray", transparent: true, opacity:0.3}));
+  return wallMesh;
+}
+function buildBallMesh (mycolor) {
+  let ballMesh = new THREE.Mesh (new THREE.CylinderGeometry(10,10,4,20), new THREE.MeshPhongMaterial());
+  ballMesh.material.color = mycolor;
+  return ballMesh;
+}
+init();
+animate();
+
+function init(){
+	
+	
+	//scene
+	scene = new THREE.Scene();
+	/*
+	var grid = new THREE.GridHelper(40,40, 0xaaaa00, 0x333333);//座標網格
+	scene.add (grid);
+	var axes = new THREE.AxesHelper (5);//三維
+	scene.add (axes);
+	*/
+	
+	//renderer
+	renderer = new THREE.WebGLRenderer();
+	document.body.appendChild (renderer.domElement);
+	var width = window.innerWidth;
+	var height = window.innerHeight;
+	renderer.setSize (width, height);
+	renderer.setClearColor (0xd9d3d2); //背景顏色
+	
+	//camera
+	camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+	camera.position.set (0,300,400);
+	
+	controls = new OrbitControls(camera, renderer.domElement); //OrbitControls:一個能讓滑鼠操作camera的class
+
+	window.addEventListener('resize', onWindowResize, false); //resize
+	
+	////////////////////////////////////////////
+	//floor
+	var floor = new THREE.Mesh (new THREE.PlaneGeometry(200,200), new THREE.MeshPhongMaterial({side: THREE.DoubleSide,color:0x808080}));
+	floor.rotation.x = -Math.PI/2;
+	scene.add (floor);
+	
+	//light
+	var lightA = new THREE.PointLight( 0xffffff, 0.5);
+	lightA.position.set(0, 50, 0);
+	scene.add( lightA );
+	var lightB = new THREE.AmbientLight(0x404047, 0.5);
+	lightB.position.set(100, 100, 100);
+	scene.add( lightB );
+	
+	//wall
+	let wallMesh = buildWallMesh();
+    let wall = new Wall(new THREE.Vector3(0,10,110),wallMesh);
+    walls.push (wall);
+    
+    wallMesh = buildWallMesh();
+    let wall2 = new Wall(new THREE.Vector3(0,10,-110),wallMesh);
+    walls.push (wall2);
+    
+    wallMesh = buildWallMesh();
+    let wall3 = new Wall(new THREE.Vector3(-110,10,0),wallMesh);
+    walls.push (wall3);
+    walls[2].rotation(Math.PI/2); 
+    wallMesh = buildWallMesh();
+    let wall4 = new Wall(new THREE.Vector3(110,10,0),wallMesh);
+    walls.push (wall4);
+    walls[3].rotation(Math.PI/2);
+	
+	//ball
+	let ballMesh = buildBallMesh (new THREE.Color().setHSL (Math.random(), .9, .4));
+ 
+    let ball = new Ball (new THREE.Vector3(0,3,10), new THREE.Vector3(-4,0,9), ballMesh);
+	balls.push (ball);
+    
+    ballMesh = buildBallMesh (new THREE.Color().setHSL (Math.random(), .9, .4));
+    let ball2 = new Ball (new THREE.Vector3(-10,3,28), new THREE.Vector3(1,0,8), ballMesh);
+	balls.push (ball2);
+    
+    ballMesh = buildBallMesh (new THREE.Color().setHSL (Math.random(), .9, .4));
+    let ball3 = new Ball (new THREE.Vector3(-5,3,-30), new THREE.Vector3(-5,0,4), ballMesh);
+	balls.push (ball3);
+    
+    ballMesh = buildBallMesh (new THREE.Color().setHSL (Math.random(), .9, .4));    
+    let ball4 = new Ball (new THREE.Vector3(-20,3,2), new THREE.Vector3(8,0,-3), ballMesh);
+	balls.push (ball4);
+    
+    ballMesh = buildBallMesh (new THREE.Color().setHSL (Math.random(), .9, .4));    
+    let ball5 = new Ball (new THREE.Vector3(30,3,-10), new THREE.Vector3(-3,0,2), ballMesh);
+	balls.push (ball5);
+    
+	//balls-light
+	light = new THREE.PointLight( 0xffffff,0.8);
+    scene.add( light );
+    light.color.copy (balls[0].colorEach());
+    
+    light2 = new THREE.PointLight( 0xffffff,0.8);
+    scene.add( light2 );
+    light2.color.copy (balls[1].colorEach());
+    
+    light3 = new THREE.PointLight( 0xffffff,0.8);
+    scene.add( light3 );
+    light3.color.copy (balls[2].colorEach());
+    
+    light4 = new THREE.PointLight( 0xffffff,0.8);
+    scene.add( light4 );
+    light4.color.copy (balls[3].colorEach());
+    
+    light5 = new THREE.PointLight( 0xffffff,0.8);
+    scene.add( light5 );
+    light5.color.copy (balls[4].colorEach());
+	
+}
+
+function onWindowResize() {//視窗大小改變(resize)事件發生後 讓程式做適當調整的callback
+
+  
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+	
+}
+
+function animate() {
+	
+	var dt = 0.1;
+    for (let i = 0; i < balls.length; i++){
+        balls[i].update (dt);
+        for(let j=i+1;j<balls.length;j++){
+            if(balls[i].ballBallIntersect(balls[j])){
+				collisionSound.play();
+                let v1 = balls[i].vel.clone();
+                let x1 = balls[i].pos.clone();
+                let v2 = balls[j].vel.clone();
+                let x2 = balls[j].pos.clone();
+                v1.y = 0;
+                x1.y = 0;
+                v2.y = 0;
+                x2.y = 0;
+                let v = v1.clone().sub(v2);
+                let x = x1.clone().sub(x2);
+                let correction = x.multiplyScalar(v.dot(x)/x.lengthSq());
+                v1.sub(correction);
+                v2.add(correction);
+                balls[i].vel.copy(v1);
+                balls[j].vel.copy(v2);
+            }
+        }
+    }
+	
+	light.position.copy (balls[0].pos);
+    light.position.y += 12;
+    light2.position.copy (balls[1].pos);
+    light2.position.y += 12;
+    light3.position.copy (balls[2].pos);
+    light3.position.y += 12;
+    light4.position.copy (balls[3].pos);
+    light4.position.y += 12;
+    light5.position.copy (balls[4].pos);
+    light5.position.y += 12;
+    
+    controls.update();
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+}
+
+</script>
+</body>
+
+</html>
