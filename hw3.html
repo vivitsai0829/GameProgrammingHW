@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+		#info {
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				font-size: 20px;
+				color: #ffffff;
+		}
+		body {
+			overflow: hidden
+		}
+		</style>
+	</head>
+
+<body>
+<div id="info">
+	<h1>homework3</h1>
+	<h2>Minecraft Steve</h2>
+	<button id = "toggle"> Switch View </button>
+</div>
+
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script type="importmap">
+		{
+			"imports": {
+				"three": "https://unpkg.com/three/build/three.module.js"
+			}
+		}
+</script>
+
+<script type="module">
+
+import { Gyroscope } from "https://threejs.org/examples/jsm/misc/Gyroscope.js";
+import * as THREE from "https://threejs.org/build/three.module.js";
+import { OrbitControls } from "https://threejs.org/examples/jsm/controls/OrbitControls.js";
+
+$('#toggle').click(
+	function(){
+		view = !view;
+		if(!view){
+			
+			camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+			camera.position.set (50,200,300);
+			let controls = new OrbitControls(camera, renderer.domElement);
+			
+		}
+		/*else{
+			camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+			camera.position.set (0,200,200);
+			let controls = new OrbitControls(camera, renderer.domElement);
+			view=0;
+		}*/
+	}
+);
+
+
+var view;
+var renderer, scene, camera;
+var texture;	//皮膚
+var steve;
+var head, body, Lleg, Rleg, Larm, Rarm;
+var theta = 0;
+const WW = 4;
+const HH = 12;
+var keyboard = new KeyboardState();
+
+var pos = new THREE.Vector3();
+
+var clock = new THREE.Clock();
+var ts;// = -1; // ts < 0 --> not yet started
+var t;
+var state = 'Stand';
+var T = 1;
+var walking = false;
+var gyro;
+
+var speed = 5,angle = 0,vel;
+
+//var cube;
+/*
+var pose1 = {
+    lThigh: Math.PI/6,
+    rThigh: -Math.PI/6
+}
+var pose2 = {
+    lThigh: -Math.PI/6,
+    rThigh: +Math.PI/6
+}
+var keys = [
+    [0, pose1],
+    [0.5, pose2],
+    [1, pose1]
+];
+var T = 0.6;
+var clock = new THREE.Clock();
+var ts = clock.getElapsedTime();
+
+function keyframe(t) {
+    var s = ((t - ts) % T) / T;
+
+    for (var i = 1; i < keys.length; i++) {
+        if (keys[i][0] > s) break;
+    }
+    // take i-1
+    var ii = i - 1;
+    var a = (s - keys[ii][0]) / (keys[ii + 1][0] - keys[ii][0]);
+    var intKey = [keys[ii][1].lThigh * (1 - a) + keys[ii + 1][1].lThigh * a,
+            keys[ii][1].rThigh * (1 - a) + keys[ii + 1][1].rThigh * a
+    ];
+    return intKey;
+}
+*/
+///// WALK////////////////////////
+
+var poseWalk0 = {
+  lThigh: Math.PI / 6,
+  rThigh: -Math.PI / 6
+}
+var poseWalk1 = {
+  lThigh: -Math.PI / 6,
+  rThigh: +Math.PI / 6
+}
+var keysWalk = [
+  [0, poseWalk0],
+  [0.5, poseWalk1],
+  [1, poseWalk0]
+];
+var TWalk = 2;
+
+////////////////////////////////////////////
+//// STAND //////////
+var poseStand0 = { // stand
+  lThigh: 0,
+  rThigh: 0
+}
+var poseStand1 = { // stand
+  lThigh: 0,
+  rThigh: 0
+}
+var keysStand = [
+  [0, poseStand0],
+  [0.5, poseStand0],
+  [1, poseStand1],
+];
+var TStand = 0.5; // any small amount
+
+//// stand-to-walk //////////
+/*var poseS2W0 = { // stand
+  lThigh: 0,
+  rThigh: 0
+}*/
+var poseS2W0 = poseStand1; // end of stand
+var poseS2W1 = {
+  lThigh: -Math.PI / 6,
+  rThigh: Math.PI/50 // right leg stays still
+}
+var poseS2W2 = poseWalk0; // beginning of walk
+var keysS2W = [
+  [0, poseS2W0],
+  [0.5, poseS2W1],
+  [1, poseS2W2],
+];
+var TS2W = TWalk;
+    
+//// walk-to-stand //////////
+/*var poseW2S1 = { // walk
+  lThigh: -Math.PI / 6,
+  rThigh: +Math.PI / 6
+}*/
+var poseW2S0 = poseWalk1; // end of walk
+var poseW2S1 = {
+  lThigh: -Math.PI / 6,
+  rThigh: Math.PI/50 // right leg stays still
+}
+var poseW2S2 = poseStand0; 
+var keysW2S = [
+  [0, poseW2S0],
+  [0.5, poseW2S1],
+  [1, poseW2S2],
+];
+var TW2S = TStand;
+
+//////////////////////////////////////
+function keyframeStand(t, T) { // periodic
+    let keys = keysStand;
+    var s = ((t - ts) % T) / T;
+
+    for (var i = 1; i < keys.length; i++) {
+        if (keys[i][0] > s) break;
+    }
+    // take i-1
+    var ii = i - 1;
+    var a = (s - keys[ii][0]) / (keys[ii + 1][0] - keys[ii][0]);
+    var intKey = [keys[ii][1].lThigh * (1 - a) + keys[ii + 1][1].lThigh * a,
+    keys[ii][1].rThigh * (1 - a) + keys[ii + 1][1].rThigh * a
+    ];
+    return intKey;
+}
+function keyframeS2W(t, T) {
+    if (t - ts > T) { // end of stand
+        console.log('switch to walk');
+        ts = t; // reset ts to start of walk
+        state = 'Walk';
+        //walking = true;
+        // end of S2W: return last frame
+        return [poseS2W2.lThigh, poseS2W2.rThigh];
+    }
+    
+    // non-periodic stand-to-walk animation
+    let keys = keysS2W;
+    var s = (t - ts) / T;
+
+    for (var i = 1; i < keys.length; i++) {
+        if (keys[i][0] > s) break;
+    }
+    // take i-1
+    var ii = i - 1;
+    var a = (s - keys[ii][0]) / (keys[ii + 1][0] - keys[ii][0]);
+    var intKey = [keys[ii][1].lThigh * (1 - a) + keys[ii + 1][1].lThigh * a,
+    keys[ii][1].rThigh * (1 - a) + keys[ii + 1][1].rThigh * a
+    ];
+    return intKey;
+}
+
+function keyframeWalk(t, T) { // walk; periodic
+    let keys = keysWalk;
+    var s = ((t - ts) % T) / T;
+
+    for (var i = 1; i < keys.length; i++) {
+        if (keys[i][0] > s) break;
+    }
+  // take i-1
+    var ii = i - 1;
+    var a = (s - keys[ii][0]) / (keys[ii + 1][0] - keys[ii][0]);
+    var intKey = [keys[ii][1].lThigh * (1 - a) + keys[ii + 1][1].lThigh * a,
+    keys[ii][1].rThigh * (1 - a) + keys[ii + 1][1].rThigh * a
+    ];
+    return intKey;
+}
+    
+function keyframeW2S(t, T) {
+    if (t - ts > T) { // end of stand
+        console.log('switch to stand');
+        ts = t; // reset ts to start of walk
+        state = 'Stand';
+        // end of S2W: return last frame
+        return [poseW2S2.lThigh, poseW2S2.rThigh];
+    }
+
+    // non-periodic stand-to-walk animation
+    let keys = keysW2S;
+    var s = (t - ts) / T;
+
+    for (var i = 1; i < keys.length; i++) {
+        if (keys[i][0] > s) break;
+    }
+    // take i-1
+    var ii = i - 1;
+    var a = (s - keys[ii][0]) / (keys[ii + 1][0] - keys[ii][0]);
+    var intKey = [keys[ii][1].lThigh * (1 - a) + keys[ii + 1][1].lThigh * a,
+    keys[ii][1].rThigh * (1 - a) + keys[ii + 1][1].rThigh * a
+    ];
+    return intKey;
+}
+
+
+init();
+animate();
+
+
+function init () {
+	
+	//renderer
+	renderer = new THREE.WebGLRenderer();
+	document.body.appendChild (renderer.domElement);
+	renderer.setSize (window.innerWidth, window.innerHeight);
+	renderer.setClearColor (0x888888); //背景顏色
+	
+	//scene
+	scene = new THREE.Scene();
+	var light = new THREE.PointLight( 0xffffff, 1, 1000 );
+	scene.add( light );
+	var gridXZ = new THREE.GridHelper(200, 20, 'red', 'white');
+    scene.add(gridXZ);
+	var axes = new THREE.AxesHelper (10);
+	scene.add (axes);
+	
+	var light = new THREE.PointLight(0xffffff, 1, 1000);
+	scene.add (light);
+	//camera
+	camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+	camera.position.set (0,200,300);
+	
+	let controls = new OrbitControls(camera, renderer.domElement); //OrbitControls:一個能讓滑鼠操作camera的class
+	
+	window.addEventListener('resize', onWindowResize, false); //resize
+	///////////////////////////////////////////////////////////////
+	//scene.add(buildSteve());
+	
+    document.addEventListener('keydown', handleKeyDown, false);
+
+	//SteveSkin
+	var loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('');
+    texture = loader.load ('https://i.imgur.com/YaGr55t.png');
+
+	steve = new THREE.Group();
+	head = buildHead(12.4,12.4,12.4);
+	//head.position.set(0,2.5*HH+0.3*WW,0);
+	//head.position.y = HH;
+	steve.add(head);
+	
+	body = buildBody(12.4,19.1,6.2);
+	//body.position.set (0, HH, 0);
+	steve.add(body);
+	
+	Rleg = buildRLeg(6.2,19.1,6.2);
+	//Rleg.position.set (0, HH, 0);
+	steve.add(Rleg);
+	
+	Lleg = buildLLeg(6.2,19.1,6.2);
+	//Rleg.position.set (0, HH, 0);
+	steve.add(Lleg);
+	
+	Rarm = buildRArm(6.2,19.1,6.2);
+	//RArm.position.set(1.5*WW,1.5*HH,0);
+    steve.add (Rarm);
+	
+    Larm = buildLArm(6.2,19.1,6.2);
+	//Larm.position.set(-1.5*WW,1.5*HH,0);
+    steve.add (Larm);
+	
+	scene.add(steve);
+	
+	//pose
+	Lleg.rotation.x = Math.PI/6;
+    Rleg.rotation.x = -Math.PI/6;
+    Larm.rotation.x = Math.PI/6;
+    Rarm.rotation.x = -Math.PI/6;
+	
+	
+	state = 'Stand';
+    ts = clock.getElapsedTime();
+	window.addEventListener('resize', onWindowResize, false);
+   // steve.position.y = 12;
+   // steve.rotation.y = -Math.PI;
+
+}
+
+function handleKeyDown(event) {
+    if(event.repeat){
+		return ;
+	}
+    
+    if(event.keyCode == 32){
+        if(state == 'Stand'){
+            state = 'S2W';
+            walking  = true;
+        }
+        if(state == 'Walk'){
+            ts = clock.getElapsedTime();// move ts to start of stand
+            state = 'W2S'; 
+            let intKey = keyframeW2S(ts, TW2S);
+            walking  = false;
+            Lleg.rotation.x = intKey[0];
+            Rleg.rotation.x = intKey[1]; 
+            Rarm.rotation.x = intKey[1];
+            Larm.rotation.x = intKey[0];
+        }
+        
+        
+  }
+    
+}
+
+function clamp (x, xLo, xHi) {
+	if (x < xLo) return xLo;
+    if (x > xHi) return xHi;
+    else return x;
+}
+function update(dt) {
+
+    keyboard.update();
+    
+	if ( keyboard.pressed("left") ) 
+		angle += 0.01;               
+	if ( keyboard.pressed("right") )
+		angle -= 0.01;               
+	if ( keyboard.pressed("up") )  
+		speed += 0.5;        
+	if ( keyboard.pressed("down") )  
+		speed -= 0.5;    
+
+	speed = clamp (speed, 1, 20);		
+	vel = new THREE.Vector3(speed,0,0);
+	
+	vel.applyAxisAngle (new THREE.Vector3(0,1,0), angle);
+	pos.add (vel.clone().multiplyScalar(dt)); 	
+}
+
+
+function buildHead(WW, HH, DD) {
+	/*let head = new THREE.Group();
+	let mesh = new THREE.Mesh (new THREE.BoxGeometry(2*WW,2*WW,2*WW), new THREE.MeshNormalMaterial());
+	head.add (mesh);
+	mesh.position.y = WW;
+	return head;*/
+	var geometry = new THREE.BufferGeometry();	
+    var vertices = [];
+    var indices = [];
+    var uvs = [];
+
+	////////////
+    const ww = 1;
+    const hh = 3;
+    const UU = 14*ww;
+    const VV = hh + 5*ww;
+  
+    var a = {u: 2*ww, v: hh+5*ww};
+    var b = {u: 4*ww, v: hh+5*ww};
+    var c = {u: 6*ww, v: hh+5*ww};
+    var d = {u: 0, v: hh+3*ww};
+    var e = {u: 2*ww, v: hh+3*ww};
+    var f = {u: 4*ww, v: hh+3*ww};
+    var g = {u: 6*ww, v: hh+3*ww};
+    var h = {u: 8*ww, v: hh+3*ww};
+    var i = {u: 0, v: hh+ww};
+    var j = {u: 2*ww, v: hh+ww};
+    var k = {u: 4*ww, v: hh+ww};
+    var l = {u: 6*ww, v: hh+ww};
+    var m = {u: 8*ww, v: hh+ww};
+
+    // PZ
+    vertices.push(-WW/2,HH/2,DD/2, -WW/2,-HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,HH/2,DD/2 ); // 0,3,2,1
+    indices.push(0,1,2, 0,2,3);
+    uvs.push (e.u/UU,e.v/VV, j.u/UU,j.v/VV, k.u/UU,k.v/VV, f.u/UU,f.v/VV); // e,j,k,f
+
+    // PX
+    vertices.push(WW/2,HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,-HH/2,-DD/2, WW/2,HH/2,-DD/2 ); // 1,2,6,5
+    indices.push (4,5,6, 4,6,7); // [0,1,2, 0,2,3] + 4
+    uvs.push (f.u/UU,f.v/VV, k.u/UU,k.v/VV, l.u/UU,l.v/VV, g.u/UU,g.v/VV); // f,k,l,g
+
+    // NX
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,-HH/2,DD/2, -WW/2,HH/2,DD/2 ); // 4,7,3,0
+    indices.push (8,9,10, 8,10,11); // [0,1,2, 0,2,3] + 8
+    uvs.push (d.u/UU,d.v/VV, i.u/UU,i.v/VV, j.u/UU,j.v/VV, e.u/UU,e.v/VV); // d,i,j,e
+
+    // NZ
+    vertices.push(WW/2,HH/2,-DD/2, WW/2,-HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,HH/2,-DD/2 ); // 5,6,7,4
+    indices.push (12,13,14, 12,14,15); // [0,1,2, 0,2,3] + 12
+    uvs.push (g.u/UU,g.v/VV, l.u/UU,l.v/VV, m.u/UU,m.v/VV, h.u/UU,h.v/VV); // g,l,m,h
+    
+    // PY
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,HH/2,DD/2, WW/2,HH/2,DD/2, WW/2,HH/2,-DD/2 ); // 4,0,1,5
+    indices.push (16,17,18, 16,18,19); // [0,1,2, 0,2,3] + 16
+    uvs.push (a.u/UU,a.v/VV, e.u/UU,e.v/VV, f.u/UU,f.v/VV, b.u/UU,b.v/VV); // A,E,F,B
+
+    // NY
+    vertices.push(-WW/2,-HH/2,DD/2, -WW/2,-HH/2,-DD/2, WW/2,-HH/2,-DD/2, WW/2,-HH/2,DD/2 ); //3,7,6,2
+    indices.push (20,21,22, 20,22,23); // [0,1,2, 0,2,3] + 20
+    uvs.push (b.u/UU,b.v/VV, f.u/UU,f.v/VV, g.u/UU,g.v/VV, c.u/UU,c.v/VV); // b,f,g,c
+    
+    geometry.setIndex(indices);  
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));	
+
+    let head = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
+    head.position.set(0,2.5*HH+0.3*WW,0);
+    return head;
+	
+}	
+
+function buildBody(WW, HH, DD) {
+	/*let body = new THREE.Group();
+	let mesh = new THREE.Mesh (new THREE.BoxGeometry(2*WW,HH,WW), new THREE.MeshNormalMaterial());
+	body.add (mesh);
+	mesh.position.y = HH;
+
+	return body;*/
+	
+	var geometry = new THREE.BufferGeometry();	
+	var vertices = [];
+	var indices = [];
+	var uvs = [];
+
+	const ww = 1;
+	const hh = 3;
+	const UU = 14*ww;
+	const VV = hh + 5*ww;
+
+	var a = {u: 5*ww, v:hh+ww};
+	var b = {u: 7*ww, v:hh+ww};
+	var c = {u: 9*ww, v:hh+ww};
+	var d = {u: 4*ww, v:hh};
+	var e = {u: 5*ww, v:hh};
+	var f = {u: 7*ww, v:hh};
+	var g = {u: 8*ww, v:hh};
+	var h = {u: 10*ww, v:hh};
+	var i = {u: 4*ww, v:0};
+	var j = {u: 5*ww, v:0};
+	var k = {u: 7*ww, v:0};
+	var l = {u: 8*ww, v:0};
+	var m = {u: 10*ww, v:0};
+	var x = {u: 9*ww, v: hh};
+
+	// PZ
+	vertices.push(-WW/2,HH/2,DD/2, -WW/2,-HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,HH/2,DD/2 ); // 0,3,2,1
+	indices.push(0,1,2, 0,2,3);
+	uvs.push (e.u/UU,e.v/VV, j.u/UU,j.v/VV, k.u/UU,k.v/VV, f.u/UU,f.v/VV); // e,j,k,f
+
+	// PX
+	vertices.push(WW/2,HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,-HH/2,-DD/2, WW/2,HH/2,-DD/2 ); // 1,2,6,5
+	indices.push (4,5,6, 4,6,7); // [0,1,2, 0,2,3] + 4
+	uvs.push (f.u/UU,f.v/VV, k.u/UU,k.v/VV, l.u/UU,l.v/VV, g.u/UU,g.v/VV); // f,k,l,g
+
+	// NX
+	vertices.push(-WW/2,HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,-HH/2,DD/2, -WW/2,HH/2,DD/2 ); // 4,7,3,0
+	indices.push (8,9,10, 8,10,11); // [0,1,2, 0,2,3] + 8
+	uvs.push (d.u/UU,d.v/VV, i.u/UU,i.v/VV, j.u/UU,j.v/VV, e.u/UU,e.v/VV); // d,i,j,e
+
+	// NZ
+	vertices.push(WW/2,HH/2,-DD/2, WW/2,-HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,HH/2,-DD/2 ); // 5,6,7,4
+	indices.push (20,21,22, 20,22,23); // [0,1,2, 0,2,3] + 20
+	uvs.push (g.u/UU,g.v/VV, l.u/UU,l.v/VV, m.u/UU,m.v/VV, h.u/UU,h.v/VV); // g,l,m,h
+
+	// PY
+	vertices.push(-WW/2,HH/2,-DD/2, -WW/2,HH/2,DD/2, WW/2,HH/2,DD/2, WW/2,HH/2,-DD/2 ); // 4,0,1,5
+	indices.push (16,17,18, 16,18,19); // [0,1,2, 0,2,3] + 16
+	uvs.push (a.u/UU,a.v/VV, e.u/UU,e.v/VV, f.u/UU,f.v/VV, b.u/UU,b.v/VV); // a,e,f,b
+
+	// NY
+	vertices.push(-WW/2,-HH/2,DD/2, -WW/2,-HH/2,-DD/2, WW/2,-HH/2,-DD/2, WW/2,-HH/2,DD/2 ); // 3,7,6,2
+	indices.push (12,13,14, 12,14,15); // [0,1,2, 0,2,3] + 12
+	uvs.push (b.u/UU,b.v/VV, f.u/UU,f.v/VV, x.u/UU,x.v/VV, c.u/UU,c.v/VV); // b,f,x,c
+
+	geometry.setIndex(indices);  
+	geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+	geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));	
+
+	let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
+	let body = new THREE.Group();
+	body.add(mesh);
+	mesh.position.set(0, HH, 0);
+	return body;
+}
+
+function buildRLeg(WW, HH, DD) {
+
+    var geometry = new THREE.BufferGeometry();	
+    var vertices = [];
+    var indices = [];
+    var uvs = [];
+
+	////////////
+    const ww = 1;
+    const hh = 3;
+    const UU = 14*ww;
+    const VV = hh + 5*ww;
+  
+    var a = {u: ww, v: hh+ww};
+    var b = {u: 2*ww, v: hh+ww};
+    var c = {u: 3*ww, v: hh+ww};
+    var d = {u: 0, v: hh};
+    var e = {u: ww, v: hh};
+    var f = {u: 2*ww, v: hh};
+    var g = {u: 3*ww, v: hh};
+    var h = {u: 4*ww, v: hh};
+    var i = {u: 0, v: 0};
+    var j = {u: ww, v: 0};
+    var k = {u: 2*ww, v: 0};
+    var l = {u: 3*ww, v: 0};
+    var m = {u: 4*ww, v: 0};
+
+    // PZ
+    vertices.push(-WW/2,HH/2,DD/2, -WW/2,-HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,HH/2,DD/2 ); // 0,3,2,1
+    indices.push(0,1,2, 0,2,3);
+    uvs.push (e.u/UU,e.v/VV, j.u/UU,j.v/VV, k.u/UU,k.v/VV, f.u/UU,f.v/VV); // e,j,k,f
+
+    // PX
+    vertices.push(WW/2,HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,-HH/2,-DD/2, WW/2,HH/2,-DD/2 ); // 1,2,6,5
+    indices.push (4,5,6, 4,6,7); // [0,1,2, 0,2,3] + 4
+    uvs.push (f.u/UU,f.v/VV, k.u/UU,k.v/VV, l.u/UU,l.v/VV, g.u/UU,g.v/VV); // f,k,l,g
+
+    // NX
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,-HH/2,DD/2, -WW/2,HH/2,DD/2 ); // 4,7,3,0
+    indices.push (8,9,10, 8,10,11); // [0,1,2, 0,2,3] + 8
+    uvs.push (d.u/UU,d.v/VV, i.u/UU,i.v/VV, j.u/UU,j.v/VV, e.u/UU,e.v/VV); // d,i,j,e
+
+    // NZ
+    vertices.push(WW/2,HH/2,-DD/2, WW/2,-HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,HH/2,-DD/2 ); // 5,6,7,4
+    indices.push (12,13,14, 12,14,15); // [0,1,2, 0,2,3] + 12
+    uvs.push (g.u/UU,g.v/VV, l.u/UU,l.v/VV, m.u/UU,m.v/VV, h.u/UU,h.v/VV); // g,l,m,h
+    
+    // PY
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,HH/2,DD/2, WW/2,HH/2,DD/2, WW/2,HH/2,-DD/2 ); // 4,0,1,5
+    indices.push (16,17,18, 16,18,19); // [0,1,2, 0,2,3] + 16
+    uvs.push (a.u/UU,a.v/VV, e.u/UU,e.v/VV, f.u/UU,f.v/VV, b.u/UU,b.v/VV); // A,E,F,B
+
+    // NY
+    vertices.push(-WW/2,-HH/2,DD/2, -WW/2,-HH/2,-DD/2, WW/2,-HH/2,-DD/2, WW/2,-HH/2,DD/2 ); //3,7,6,2
+    indices.push (20,21,22, 20,22,23); // [0,1,2, 0,2,3] + 20
+    uvs.push (b.u/UU,b.v/VV, f.u/UU,f.v/VV, g.u/UU,g.v/VV, c.u/UU,c.v/VV); // b,f,g,c
+    
+    geometry.setIndex(indices);  
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));	
+
+    let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
+    Rleg = new THREE.Group();
+    Rleg.add(mesh);
+    Rleg.position.set(-0.5*WW,0.5*HH,0);
+    mesh.position.y = -HH/2;
+    return Rleg;
+}
+
+function buildLLeg(WW, HH, DD) {
+
+    var geometry = new THREE.BufferGeometry();	
+    var vertices = [];
+    var indices = [];
+    var uvs = [];
+
+	////////////
+    const ww = 1;
+    const hh = 3;
+    const UU = 14*ww;
+    const VV = hh + 5*ww;
+  
+    var a = {u: ww, v: hh+ww};
+    var b = {u: 2*ww, v: hh+ww};
+    var c = {u: 3*ww, v: hh+ww};
+    var d = {u: 0, v: hh};
+    var e = {u: ww, v: hh};
+    var f = {u: 2*ww, v: hh};
+    var g = {u: 3*ww, v: hh};
+    var h = {u: 4*ww, v: hh};
+    var i = {u: 0, v: 0};
+    var j = {u: ww, v: 0};
+    var k = {u: 2*ww, v: 0};
+    var l = {u: 3*ww, v: 0};
+    var m = {u: 4*ww, v: 0};
+
+    // PZ
+    vertices.push(-WW/2,HH/2,DD/2, -WW/2,-HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,HH/2,DD/2 ); // 0,3,2,1
+    indices.push(0,1,2, 0,2,3);
+    uvs.push (e.u/UU,e.v/VV, j.u/UU,j.v/VV, k.u/UU,k.v/VV, f.u/UU,f.v/VV); // e,j,k,f
+
+    // PX
+    vertices.push(WW/2,HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,-HH/2,-DD/2, WW/2,HH/2,-DD/2 ); // 1,2,6,5
+    indices.push (4,5,6, 4,6,7); // [0,1,2, 0,2,3] + 4
+    uvs.push (f.u/UU,f.v/VV, k.u/UU,k.v/VV, l.u/UU,l.v/VV, g.u/UU,g.v/VV); // f,k,l,g
+
+    // NX
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,-HH/2,DD/2, -WW/2,HH/2,DD/2 ); // 4,7,3,0
+    indices.push (8,9,10, 8,10,11); // [0,1,2, 0,2,3] + 8
+    uvs.push (d.u/UU,d.v/VV, i.u/UU,i.v/VV, j.u/UU,j.v/VV, e.u/UU,e.v/VV); // d,i,j,e
+
+    // NZ
+    vertices.push(WW/2,HH/2,-DD/2, WW/2,-HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,HH/2,-DD/2 ); // 5,6,7,4
+    indices.push (12,13,14, 12,14,15); // [0,1,2, 0,2,3] + 12
+    uvs.push (g.u/UU,g.v/VV, l.u/UU,l.v/VV, m.u/UU,m.v/VV, h.u/UU,h.v/VV); // g,l,m,h
+    
+    // PY
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,HH/2,DD/2, WW/2,HH/2,DD/2, WW/2,HH/2,-DD/2 ); // 4,0,1,5
+    indices.push (16,17,18, 16,18,19); // [0,1,2, 0,2,3] + 16
+    uvs.push (a.u/UU,a.v/VV, e.u/UU,e.v/VV, f.u/UU,f.v/VV, b.u/UU,b.v/VV); // A,E,F,B
+
+    // NY
+    vertices.push(-WW/2,-HH/2,DD/2, -WW/2,-HH/2,-DD/2, WW/2,-HH/2,-DD/2, WW/2,-HH/2,DD/2 ); //3,7,6,2
+    indices.push (20,21,22, 20,22,23); // [0,1,2, 0,2,3] + 20
+    uvs.push (b.u/UU,b.v/VV, f.u/UU,f.v/VV, g.u/UU,g.v/VV, c.u/UU,c.v/VV); // b,f,g,c
+    
+    geometry.setIndex(indices);  
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));	
+
+    let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
+    Lleg = new THREE.Group();
+    Lleg.add(mesh);
+    Lleg.position.set(0.5*WW,0.5*HH,0);
+    mesh.position.y = -HH/2;
+    return Lleg;
+}
+
+function buildRArm(WW, HH, DD) {
+
+    var geometry = new THREE.BufferGeometry();	
+    var vertices = [];
+    var indices = [];
+    var uvs = [];
+
+	////////////
+    const ww = 1;
+    const hh = 3;
+    const UU = 14*ww;
+    const VV = hh + 5*ww;
+  
+    var a = {u:11*ww, v: hh+ww};
+    var b = {u: 12*ww, v: hh+ww};
+    var c = {u: 13*ww, v: hh+ww};
+    var d = {u: 10*ww, v: hh};
+    var e = {u: 11*ww, v: hh};
+    var f = {u: 12*ww, v: hh};
+    var g = {u: 13*ww, v: hh};
+    var h = {u: 14*ww, v: hh};
+    var i = {u: 10*ww, v: 0};
+    var j = {u: 11*ww, v: 0};
+    var k = {u: 12*ww, v: 0};
+    var l = {u: 13*ww, v: 0};
+    var m = {u: 14*ww, v: 0};
+
+    // PZ
+    vertices.push(-WW/2,HH/2,DD/2, -WW/2,-HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,HH/2,DD/2 ); // 0,3,2,1
+    indices.push(0,1,2, 0,2,3);
+    uvs.push (e.u/UU,e.v/VV, j.u/UU,j.v/VV, k.u/UU,k.v/VV, f.u/UU,f.v/VV); // e,j,k,f
+
+    // PX
+    vertices.push(WW/2,HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,-HH/2,-DD/2, WW/2,HH/2,-DD/2 ); // 1,2,6,5
+    indices.push (4,5,6, 4,6,7); // [0,1,2, 0,2,3] + 4
+    uvs.push (f.u/UU,f.v/VV, k.u/UU,k.v/VV, l.u/UU,l.v/VV, g.u/UU,g.v/VV); // f,k,l,g
+
+    // NX
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,-HH/2,DD/2, -WW/2,HH/2,DD/2 ); // 4,7,3,0
+    indices.push (8,9,10, 8,10,11); // [0,1,2, 0,2,3] + 8
+    uvs.push (d.u/UU,d.v/VV, i.u/UU,i.v/VV, j.u/UU,j.v/VV, e.u/UU,e.v/VV); // d,i,j,e
+
+    // NZ
+    vertices.push(WW/2,HH/2,-DD/2, WW/2,-HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,HH/2,-DD/2 ); // 5,6,7,4
+    indices.push (12,13,14, 12,14,15); // [0,1,2, 0,2,3] + 12
+    uvs.push (g.u/UU,g.v/VV, l.u/UU,l.v/VV, m.u/UU,m.v/VV, h.u/UU,h.v/VV); // g,l,m,h
+    
+    // PY
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,HH/2,DD/2, WW/2,HH/2,DD/2, WW/2,HH/2,-DD/2 ); // 4,0,1,5
+    indices.push (16,17,18, 16,18,19); // [0,1,2, 0,2,3] + 16
+    uvs.push (a.u/UU,a.v/VV, e.u/UU,e.v/VV, f.u/UU,f.v/VV, b.u/UU,b.v/VV); // A,E,F,B
+
+    // NY
+    vertices.push(-WW/2,-HH/2,DD/2, -WW/2,-HH/2,-DD/2, WW/2,-HH/2,-DD/2, WW/2,-HH/2,DD/2 ); //3,7,6,2
+    indices.push (20,21,22, 20,22,23); // [0,1,2, 0,2,3] + 20
+    uvs.push (b.u/UU,b.v/VV, f.u/UU,f.v/VV, g.u/UU,g.v/VV, c.u/UU,c.v/VV); // b,f,g,c
+    
+    geometry.setIndex(indices);  
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));	
+
+    let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
+    Rarm = new THREE.Group();
+    Rarm.add(mesh);
+    Rarm.position.set(1.5*WW,1.5*HH,0);
+    mesh.position.y = -HH/2;
+    return Rarm;
+}
+
+function buildLArm(WW, HH, DD) {
+
+    var geometry = new THREE.BufferGeometry();	
+    var vertices = [];
+    var indices = [];
+    var uvs = [];
+
+	////////////
+    const ww = 1;
+    const hh = 3;
+    const UU = 14*ww;
+    const VV = hh + 5*ww;
+  
+    var a = {u:11*ww, v: hh+ww};
+    var b = {u: 12*ww, v: hh+ww};
+    var c = {u: 13*ww, v: hh+ww};
+    var d = {u: 10*ww, v: hh};
+    var e = {u: 11*ww, v: hh};
+    var f = {u: 12*ww, v: hh};
+    var g = {u: 13*ww, v: hh};
+    var h = {u: 14*ww, v: hh};
+    var i = {u: 10*ww, v: 0};
+    var j = {u: 11*ww, v: 0};
+    var k = {u: 12*ww, v: 0};
+    var l = {u: 13*ww, v: 0};
+    var m = {u: 14*ww, v: 0};
+
+    // PZ
+    vertices.push(-WW/2,HH/2,DD/2, -WW/2,-HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,HH/2,DD/2 ); // 0,3,2,1
+    indices.push(0,1,2, 0,2,3);
+    uvs.push (e.u/UU,e.v/VV, j.u/UU,j.v/VV, k.u/UU,k.v/VV, f.u/UU,f.v/VV); // e,j,k,f
+
+    // PX
+    vertices.push(WW/2,HH/2,DD/2, WW/2,-HH/2,DD/2, WW/2,-HH/2,-DD/2, WW/2,HH/2,-DD/2 ); // 1,2,6,5
+    indices.push (4,5,6, 4,6,7); // [0,1,2, 0,2,3] + 4
+    uvs.push (f.u/UU,f.v/VV, k.u/UU,k.v/VV, l.u/UU,l.v/VV, g.u/UU,g.v/VV); // f,k,l,g
+
+    // NX
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,-HH/2,DD/2, -WW/2,HH/2,DD/2 ); // 4,7,3,0
+    indices.push (8,9,10, 8,10,11); // [0,1,2, 0,2,3] + 8
+    uvs.push (d.u/UU,d.v/VV, i.u/UU,i.v/VV, j.u/UU,j.v/VV, e.u/UU,e.v/VV); // d,i,j,e
+
+    // NZ
+    vertices.push(WW/2,HH/2,-DD/2, WW/2,-HH/2,-DD/2, -WW/2,-HH/2,-DD/2, -WW/2,HH/2,-DD/2 ); // 5,6,7,4
+    indices.push (12,13,14, 12,14,15); // [0,1,2, 0,2,3] + 12
+    uvs.push (g.u/UU,g.v/VV, l.u/UU,l.v/VV, m.u/UU,m.v/VV, h.u/UU,h.v/VV); // g,l,m,h
+    
+    // PY
+    vertices.push(-WW/2,HH/2,-DD/2, -WW/2,HH/2,DD/2, WW/2,HH/2,DD/2, WW/2,HH/2,-DD/2 ); // 4,0,1,5
+    indices.push (16,17,18, 16,18,19); // [0,1,2, 0,2,3] + 16
+    uvs.push (a.u/UU,a.v/VV, e.u/UU,e.v/VV, f.u/UU,f.v/VV, b.u/UU,b.v/VV); // A,E,F,B
+
+    // NY
+    vertices.push(-WW/2,-HH/2,DD/2, -WW/2,-HH/2,-DD/2, WW/2,-HH/2,-DD/2, WW/2,-HH/2,DD/2 ); //3,7,6,2
+    indices.push (20,21,22, 20,22,23); // [0,1,2, 0,2,3] + 20
+    uvs.push (b.u/UU,b.v/VV, f.u/UU,f.v/VV, g.u/UU,g.v/VV, c.u/UU,c.v/VV); // b,f,g,c
+    
+    geometry.setIndex(indices);  
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));	
+
+    let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
+    Larm = new THREE.Group();
+    Larm.add(mesh);
+    Larm.position.set(-1.5*WW,1.5*HH,0);
+    mesh.position.y = -HH/2;
+    return Larm;
+}
+
+function buildSteve(){
+	//var steve = new THREE.Group();
+	//cube = new THREE.Mesh (new THREE.BoxGeometry (3,1,2), new THREE.MeshNormalMaterial());
+	//cube.position.set(1,1,1);
+	
+	//steve.add(cube);
+	//return steve;
+}
+
+
+
+function onWindowResize() {//視窗大小改變(resize)事件發生後 讓程式做適當調整的callback
+
+  
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+	
+}
+
+
+
+function animate() {
+
+	keyboard.update();
+    /*if(on){
+        let cameraPos = new THREE.Vector3(0,8*WW,-14*WW);
+        head.localToWorld (cameraPos);
+        camera.position.copy (cameraPos);
+        let cameraLookAt = new THREE.Vector3(0,2*WW,0);
+        head.localToWorld (cameraLookAt);
+        camera.lookAt (cameraLookAt);
+    }*/
+    
+    requestAnimationFrame(animate);
+    render();
+    if(walking){
+        var dt = clock.getDelta();
+        update(dt);
+
+        // car update
+        steve.position.copy(pos);
+        steve.rotation.y = angle+Math.PI/2;
+    }
+	
+	////////////////////////////////
+	//let dt = clock.getDelta();
+	//let vel = 50;
+    // delayed development due to wifi lag ...
+    if (view) {
+        //person.position.x -= vel*dt;
+        //console.log (dt);//torso.position.x)
+        /*camera.position.x = person.position.x + 40;
+        camera.lookAt (person.position.x, 0, 0); */
+        gyro = new Gyroscope();
+        steve.add (gyro);
+        gyro.add (camera);
+    }
+	
+	let intKey;
+    switch (state) {
+        case 'Stand':
+            console.log('... in stand');
+            intKey = keyframeStand(clock.getElapsedTime(), TStand);
+            break;
+        case 'S2W':
+            console.log('... in S2W');
+            intKey = keyframeS2W(clock.getElapsedTime(), TS2W);
+            break;
+        case 'Walk':
+            console.log('... in walk');
+            intKey = keyframeWalk(clock.getElapsedTime(), TWalk);
+            break;
+        case 'W2S':
+            console.log('... in W2S');
+            intKey = keyframeW2S(clock.getElapsedTime(), TW2S);
+            break;
+    }
+	//let intKey = keyframe(clock.getElapsedTime());
+    Lleg.rotation.x = intKey[0];
+    Rleg.rotation.x = intKey[1]; 
+    Rarm.rotation.x = intKey[1];
+    Larm.rotation.x = intKey[0];
+	
+	
+}
+
+function render() {
+	
+	renderer.render(scene, camera);
+	
+}
+
+</script>
+</body>
+
+</html>
