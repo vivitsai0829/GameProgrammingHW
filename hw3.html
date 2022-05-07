@@ -47,8 +47,11 @@ $('#toggle').click(
 			camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
 			camera.position.set (50,200,300);
 			let controls = new OrbitControls(camera, renderer.domElement);
-			
+			$('#toggle').text('Follow View');
 		}
+		if(view){
+            $('#toggle').text('Switch View');
+       }
 		/*else{
 			camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
 			camera.position.set (0,200,200);
@@ -470,7 +473,7 @@ function buildHead(WW, HH, DD) {
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));	
 
     let head = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
-    head.position.set(0,2.5*HH+0.3*WW,0);
+    head.position.set(0,3.5*HH+0.1*WW,0);
     return head;
 	
 }	
@@ -545,7 +548,7 @@ function buildBody(WW, HH, DD) {
 	let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
 	let body = new THREE.Group();
 	body.add(mesh);
-	mesh.position.set(0, HH, 0);
+	mesh.position.set(0, HH+10, 0);
 	return body;
 }
 
@@ -613,7 +616,7 @@ function buildRLeg(WW, HH, DD) {
     let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
     Rleg = new THREE.Group();
     Rleg.add(mesh);
-    Rleg.position.set(-0.5*WW,0.5*HH,0);
+    Rleg.position.set(-0.5*WW,HH,0);
     mesh.position.y = -HH/2;
     return Rleg;
 }
@@ -682,7 +685,7 @@ function buildLLeg(WW, HH, DD) {
     let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
     Lleg = new THREE.Group();
     Lleg.add(mesh);
-    Lleg.position.set(0.5*WW,0.5*HH,0);
+	Lleg.position.set(0.5*WW,HH,0);
     mesh.position.y = -HH/2;
     return Lleg;
 }
@@ -751,7 +754,7 @@ function buildRArm(WW, HH, DD) {
     let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
     Rarm = new THREE.Group();
     Rarm.add(mesh);
-    Rarm.position.set(1.5*WW,1.5*HH,0);
+    Rarm.position.set(1.5*WW,2*HH,0);
     mesh.position.y = -HH/2;
     return Rarm;
 }
@@ -820,7 +823,7 @@ function buildLArm(WW, HH, DD) {
     let mesh = new THREE.Mesh (geometry, new THREE.MeshBasicMaterial({map: texture, side:THREE.DoubleSide}));
     Larm = new THREE.Group();
     Larm.add(mesh);
-    Larm.position.set(-1.5*WW,1.5*HH,0);
+    Larm.position.set(-1.5*WW,2*HH,0);
     mesh.position.y = -HH/2;
     return Larm;
 }
