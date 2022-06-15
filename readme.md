@@ -1,5 +1,5 @@
 # GameProgramming homework
-##歡迎來到I4A40蔡欣妤vivi的GP:blush:
+##歡迎來到I4A40蔡欣妤vivi的GPhomework:blush::v::v:
 
 可以點選 [這裡](http://vivitsai0829.github.io/GameProgrammingHW/index.html) 回到homework首頁
 
